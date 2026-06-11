@@ -1,0 +1,35 @@
+title: Stagecomp Second-Stage Drop Files
+id: 7f1c2a90-3d44-4b1e-9c2a-stagecomp0003
+status: experimental
+description: |
+  Detects creation of the three files the Stagecomp downloader writes after a C2
+  "approved"/"retry" verdict: a sideload DLL (WebView2Loader.dll), the second-stage
+  binary (Game.exe), and a config (visualwincomp.txt). They are written into a
+  "GameFiles" subfolder under the user's Downloads (resolving to Public\Downloads
+  when no per-user Downloads path is available).
+references:
+  - https://github.com/yankywilson/muddywater-stagecomp-moonzonet
+author: Yanky Wilson (github.com/yankywilson)
+date: 2026/06/11
+tags:
+  - attack.command-and-control
+  - attack.t1105
+  - attack.defense-evasion
+  - attack.t1036
+logsource:
+  category: file_event
+  product: windows
+detection:
+  selection_dir:
+    TargetFilename|contains: '\GameFiles\'
+  selection_names:
+    TargetFilename|endswith:
+      - '\WebView2Loader.dll'
+      - '\Game.exe'
+      - '\visualwincomp.txt'
+  condition: selection_dir and selection_names
+falsepositives:
+  - The visualwincomp.txt name and the GameFiles path are distinctive; WebView2Loader.dll
+    is a legitimate Microsoft filename, so rely on the GameFiles directory plus the
+    co-located visualwincomp.txt or Game.exe to disambiguate from benign WebView2 apps.
+level: high

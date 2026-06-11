@@ -1,0 +1,31 @@
+title: Stagecomp Downloader Self-Delete via Ping-Delay and Delete
+id: 7f1c2a90-3d44-4b1e-9c2a-stagecomp0001
+status: experimental
+description: |
+  Detects the ping-delay self-deletion routine used by the MuddyWater Stagecomp
+  downloader. The loader spawns cmd.exe to delay (~5s via ping) so the parent fully
+  exits, then deletes its own on-disk image with del /f /q. Fires only on the
+  success/exit branch of the loader.
+references:
+  - https://github.com/yankywilson/muddywater-stagecomp-moonzonet
+  - https://www.rapid7.com  # Rapid7 'Muddying the Tracks', May 2026
+author: Yanky Wilson (github.com/yankywilson)
+date: 2026/06/11
+tags:
+  - attack.defense-evasion
+  - attack.t1070.004
+  - attack.t1059.003
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    Image|endswith: '\cmd.exe'
+    CommandLine|contains|all:
+      - 'ping 127.0.0.1 -n 6'
+      - 'del /f /q'
+  condition: selection
+falsepositives:
+  - Rare. Some installers/uninstallers use ping as a sleep, but the ping-delay
+    immediately chained to 'del /f /q' of a single file on one command line is uncommon.
+level: high

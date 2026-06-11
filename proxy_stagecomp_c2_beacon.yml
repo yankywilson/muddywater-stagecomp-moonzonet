@@ -1,0 +1,34 @@
+title: Stagecomp C2 Beacon - StageClient User-Agent and URI Chain
+id: 7f1c2a90-3d44-4b1e-9c2a-stagecomp0002
+status: experimental
+description: |
+  Detects the Stagecomp downloader's C2 beacon. The agent uses WinHTTP with the
+  exact User-Agent "StageClient/2.0" and POSTs JSON to /register, /check, /status,
+  then GETs /download/Game.{dll,exe,config}. C2 is HTTPS, so this requires a
+  TLS-inspecting proxy to observe the User-Agent and URI; without inspection, use
+  the DNS/SNI rules instead.
+references:
+  - https://github.com/yankywilson/muddywater-stagecomp-moonzonet
+author: Yanky Wilson (github.com/yankywilson)
+date: 2026/06/11
+tags:
+  - attack.command-and-control
+  - attack.t1071.001
+  - attack.t1105
+logsource:
+  category: proxy
+detection:
+  selection_ua:
+    c-useragent|contains: 'StageClient/2.0'
+  selection_host:
+    cs-host: 'moonzonet.com'
+  selection_uri:
+    cs-uri-stem|startswith:
+      - '/register'
+      - '/check'
+      - '/status'
+      - '/download/Game.'
+  condition: selection_ua or (selection_host and selection_uri)
+falsepositives:
+  - None expected. "StageClient/2.0" is a bespoke agent string with no known benign use.
+level: high

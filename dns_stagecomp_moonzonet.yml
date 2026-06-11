@@ -1,0 +1,26 @@
+title: Stagecomp C2 Domain Resolution - moonzonet.com
+id: 7f1c2a90-3d44-4b1e-9c2a-stagecomp0004
+status: experimental
+description: |
+  Detects DNS resolution of the Stagecomp C2 domain moonzonet.com. This is the
+  single strongest and most durable network indicator for this campaign. It is
+  wire-visible even though C2 content is TLS-encrypted, so it works without TLS
+  inspection. The domain is Cloudflare-fronted; do NOT pivot on the resolved IPs
+  (104.21.93.242 / 172.67.216.224) - they are shared Cloudflare edge addresses.
+references:
+  - https://github.com/yankywilson/muddywater-stagecomp-moonzonet
+author: Yanky Wilson (github.com/yankywilson)
+date: 2026/06/11
+tags:
+  - attack.command-and-control
+  - attack.t1071.001
+logsource:
+  category: dns_query
+  product: windows
+detection:
+  selection:
+    QueryName: 'moonzonet.com'
+  condition: selection
+falsepositives:
+  - None expected. The domain has no known legitimate use.
+level: high

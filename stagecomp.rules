@@ -1,0 +1,51 @@
+# =============================================================================
+# MuddyWater "Stagecomp" downloader - Suricata/Snort-style rules
+# Author : Yanky Wilson (github.com/yankywilson)
+# Date   : 2026-06-11
+# TLP    : CLEAR
+# SID    : local range 92000001-92000004 (adjust to your sensor's reserved range)
+#
+# WIRE-VISIBLE vs TLS-INSPECTION:
+#   - SIDs ...01 and ...02 (DNS query, TLS SNI) work on the wire as-is.
+#   - SIDs ...03 and ...04 (HTTP User-Agent, HTTP URI) only fire if TLS is
+#     decrypted (SSL/TLS inspection), because C2 runs over HTTPS:443.
+#
+# DELIBERATELY EXCLUDED (do not add these back):
+#   - JA3/JA3S hashes  : derived from the OS Schannel stack, not actor-controlled.
+#   - Cloudflare edge IPs (104.21.93.242 / 172.67.216.224) : shared fronts, non-durable.
+# =============================================================================
+
+# [Wire-visible] DNS query for the C2 domain
+alert dns $HOME_NET any -> any any ( \
+    msg:"ET-STYLE MuddyWater Stagecomp DNS Query moonzonet.com"; \
+    dns.query; content:"moonzonet.com"; nocase; isdataat:!1,relative; \
+    classtype:trojan-activity; \
+    metadata: malware_family Stagecomp, actor MuddyWater, confidence high; \
+    sid:92000001; rev:1; )
+
+# [Wire-visible] TLS SNI to the C2 domain (ClientHello, before encryption)
+alert tls $HOME_NET any -> $EXTERNAL_NET 443 ( \
+    msg:"ET-STYLE MuddyWater Stagecomp TLS SNI moonzonet.com"; \
+    tls.sni; content:"moonzonet.com"; nocase; \
+    classtype:trojan-activity; \
+    metadata: malware_family Stagecomp, actor MuddyWater, confidence high; \
+    sid:92000002; rev:1; )
+
+# [Requires TLS inspection] Bespoke C2 User-Agent
+alert http $HOME_NET any -> $EXTERNAL_NET any ( \
+    msg:"ET-STYLE MuddyWater Stagecomp C2 User-Agent StageClient/2.0 (requires TLS inspection)"; \
+    flow:established,to_server; \
+    http.user_agent; content:"StageClient/2.0"; \
+    classtype:trojan-activity; \
+    metadata: malware_family Stagecomp, actor MuddyWater, confidence high; \
+    sid:92000003; rev:1; )
+
+# [Requires TLS inspection] Second-stage download URI
+alert http $HOME_NET any -> $EXTERNAL_NET any ( \
+    msg:"ET-STYLE MuddyWater Stagecomp C2 Download URI /download/Game.* (requires TLS inspection)"; \
+    flow:established,to_server; \
+    http.method; content:"GET"; \
+    http.uri; content:"/download/Game."; \
+    classtype:trojan-activity; \
+    metadata: malware_family Stagecomp, actor MuddyWater, confidence high; \
+    sid:92000004; rev:1; )

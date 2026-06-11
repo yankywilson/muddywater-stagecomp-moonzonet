@@ -1,0 +1,72 @@
+// =============================================================================
+// MuddyWater "Stagecomp" downloader - KQL hunting pack
+// Platform : Microsoft Defender XDR (advanced hunting) / Sentinel
+// Author   : Yanky Wilson (github.com/yankywilson)
+// Date     : 2026-06-11
+// TLP      : CLEAR
+//
+// Each query is standalone. Run individually. Tune time window as needed.
+// NOTE: Do NOT hunt on the Cloudflare edge IPs (104.21.93.242 / 172.67.216.224)
+//       - they are shared fronts and will generate false positives.
+// =============================================================================
+
+
+// 1) C2 domain - network connections / URL to moonzonet.com  (strongest indicator)
+DeviceNetworkEvents
+| where Timestamp > ago(30d)
+| where RemoteUrl has "moonzonet.com" or RemoteUrl =~ "moonzonet.com"
+| project Timestamp, DeviceName, InitiatingProcessFileName, InitiatingProcessFolderPath,
+          RemoteUrl, RemoteIP, RemotePort, InitiatingProcessSHA256
+| order by Timestamp desc
+
+
+// 2) Self-delete - ping-delay chained to del /f /q
+DeviceProcessEvents
+| where Timestamp > ago(30d)
+| where FileName =~ "cmd.exe"
+| where ProcessCommandLine has "ping 127.0.0.1 -n 6"
+      and ProcessCommandLine has "del /f /q"
+| project Timestamp, DeviceName, InitiatingProcessFileName, ProcessCommandLine,
+          InitiatingProcessFolderPath, InitiatingProcessSHA256
+| order by Timestamp desc
+
+
+// 3) Second-stage drop files written into a GameFiles folder
+DeviceFileEvents
+| where Timestamp > ago(30d)
+| where FolderPath has "\\GameFiles\\"
+| where FileName in~ ("WebView2Loader.dll", "Game.exe", "visualwincomp.txt")
+| project Timestamp, DeviceName, ActionType, FolderPath, FileName,
+          InitiatingProcessFileName, InitiatingProcessSHA256
+| order by Timestamp desc
+
+
+// 4) Distinctive config filename anywhere (visualwincomp.txt is near-unique)
+DeviceFileEvents
+| where Timestamp > ago(30d)
+| where FileName =~ "visualwincomp.txt"
+| project Timestamp, DeviceName, ActionType, FolderPath, FileName, InitiatingProcessFileName
+| order by Timestamp desc
+
+
+// 5) Known-sample hash hunt (loader)
+let StagecompHashes = dynamic([
+    "a92d28f1d32e3a9ab7c3691f8bfca8f7586bb0666adbba47eab3e1a8faf7ecc0", // SHA-256
+    "0ba2306ec15f7124fafc7615e81f34c7986ba9a5",                          // SHA-1
+    "7f3c8a7fe78d3d05b6022df3ea0c15fb"                                   // MD5
+]);
+union DeviceFileEvents, DeviceProcessEvents, DeviceImageLoadEvents
+| where Timestamp > ago(90d)
+| where SHA256 in~ (StagecompHashes) or SHA1 in~ (StagecompHashes) or MD5 in~ (StagecompHashes)
+| project Timestamp, DeviceName, FileName, FolderPath, SHA256, SHA1, MD5
+| order by Timestamp desc
+
+
+// 6) Execution of the second stage from the staging folder
+DeviceProcessEvents
+| where Timestamp > ago(30d)
+| where FileName =~ "Game.exe"
+| where FolderPath has "\\GameFiles\\" or FolderPath has "\\Public\\Downloads\\"
+| project Timestamp, DeviceName, FileName, FolderPath, ProcessCommandLine,
+          InitiatingProcessFileName, InitiatingProcessSHA256
+| order by Timestamp desc
